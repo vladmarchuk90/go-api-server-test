@@ -2,6 +2,7 @@ package model
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"math/big"
 
@@ -10,6 +11,19 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/vladmarchuk90/go-api-server-test/contract"
 )
+
+type Group struct {
+	Name    string     `json:"name"`
+	Indexes []*big.Int `json:"indexes"`
+}
+
+type Index struct {
+	Name              string   `json:"name"`
+	EthPriceInWei     *big.Int `json:"ethpriceinwei"`
+	UsdPriceInCents   *big.Int `json:"usdpriceincents"`
+	UsdCapitalization *big.Int `json:"usdcapitalization"`
+	PercentageChange  *big.Int `json:"percentagechange"`
+}
 
 var client *ethclient.Client
 var smartContract *contract.SmartcontractCaller
@@ -36,70 +50,70 @@ func CloseConnection() {
 }
 
 // Respective methods to api/comtroller methods
-func GetGroups() (groupIds []*big.Int) {
+func GetGroups() ([]*big.Int, error) {
 
 	groupIds, err := smartContract.GetGroupIds(nil)
 	if err != nil {
-		log.Printf("Failed to get groups: %v", err)
-		return
+		return groupIds, fmt.Errorf("failed to get groups: %v", err)
 	}
 
-	return
+	return groupIds, nil
 }
 
-func GetGroup(groupIdString string) (group struct {
-	Name    string
-	Indexes []*big.Int
-}) {
+func GetGroup(groupIdString string) (*Group, error) {
+
+	var group *Group
 
 	groupId := new(big.Int)
 	groupId, ok := groupId.SetString(groupIdString, 10)
 	if !ok {
-		log.Printf("Failed to convert group Id parameter in big Int: %v", groupIdString)
-		return
+		return group, fmt.Errorf("failed to convert group Id parameter to big Int: %v", groupIdString)
 	}
 
-	group, err := smartContract.GetGroup(nil, groupId)
+	contractGroup, err := smartContract.GetGroup(nil, groupId)
 	if err != nil {
-		log.Printf("Failed to get group by id: %v, error: %v", groupId, err)
-		return
+		return group, fmt.Errorf("failed to get group by id: %v, error: %v", groupId, err)
 	}
 
-	return
+	_group := Group(contractGroup)
+
+	group = &_group
+	return group, nil
 }
 
-func GetIndex(indexIdString string) (index struct {
-	Name              string
-	EthPriceInWei     *big.Int
-	UsdPriceInCents   *big.Int
-	UsdCapitalization *big.Int
-	PercentageChange  *big.Int
-}) {
+func GetIndex(indexIdString string) (*Index, error) {
+
+	var index *Index
 
 	indexId := new(big.Int)
 	indexId, ok := indexId.SetString(indexIdString, 10)
 	if !ok {
-		log.Printf("Failed to convert index Id parameter in big Int: %v", indexIdString)
-		return
+		return index, fmt.Errorf("failed to convert group Id parameter to big Int: %v", indexIdString)
 	}
 
-	index, err := smartContract.GetIndex(nil, indexId)
+	contractIndex, err := smartContract.GetIndex(nil, indexId)
 	if err != nil {
-		log.Printf("Failed to get index by id: %v, error: %v", indexId, err)
-		return
+		return index, fmt.Errorf("failed to get index by id: %v, error: %v", indexId, err)
 	}
 
-	return
+	_index := Index(contractIndex)
+	index = &_index
+
+	return index, nil
 }
 
-func GetBlock(blockParameter string) (block *types.Header) {
+func GetBlock(blockParameter string) (*types.Header, error) {
+
+	var blockInfo *types.Header
 
 	if blockParameter == "latest" {
 		block, err := client.BlockByNumber(context.Background(), nil)
 		if err != nil {
-			log.Printf("Failed to get latest block: %v,", err)
+			return blockInfo, fmt.Errorf("failed to get latest block: %v,", err)
 		}
-		return block.Header()
+
+		blockInfo = block.Header()
+		return blockInfo, nil
 	} else {
 		// Trying to understand what kind of parameter hash or number
 		// Firstly check if it's number
@@ -110,9 +124,10 @@ func GetBlock(blockParameter string) (block *types.Header) {
 
 			block, err := client.BlockByNumber(context.Background(), blockNumber)
 			if err != nil {
-				log.Printf("Failed to get block by number: %v, error: %v", blockNumber, err)
+				return blockInfo, fmt.Errorf("failed to get block by number: %v, error: %v", blockNumber, err)
 			}
-			return block.Header()
+			blockInfo = block.Header()
+			return blockInfo, nil
 
 		} else {
 
@@ -120,10 +135,10 @@ func GetBlock(blockParameter string) (block *types.Header) {
 			hash := common.HexToHash(blockParameter)
 			block, err := client.BlockByHash(context.Background(), hash)
 			if err != nil {
-				log.Printf("Failed to get block by hash: %v, error: %v", hash, err)
+				return blockInfo, fmt.Errorf("failed to get block by hash: %v, error: %v", hash, err)
 			}
-			return block.Header()
-
+			blockInfo = block.Header()
+			return blockInfo, nil
 		}
 	}
 }
